@@ -89,7 +89,7 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 		f.Seek(off, 0)
 	}
 
-	dylibPathSize := len(padPath(os.Args[2], 8))
+	dylibPathSize := len(padPath(c.dylibPath, 8))
 
 	cmdSize := int(unsafe.Sizeof(macho.LoadHeader{})) + int(unsafe.Sizeof(macho.Dylib{})) + dylibPathSize
 
@@ -154,7 +154,7 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 	binary.Write(c.bts, binary.LittleEndian, dlib)
 
 	// calculate padded path and write it to new file
-	paddedPath := padPath(os.Args[2], 8)
+	paddedPath := padPath(c.dylibPath, 8)
 	binary.Write(c.bts, binary.LittleEndian, paddedPath)
 
 	currentOff := int64(unsafe.Sizeof(hdr)) + int64(hdr.SizeOfCmds)
