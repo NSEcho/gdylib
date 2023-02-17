@@ -28,6 +28,7 @@ type LoadHeader struct {
 
 type Load struct {
 	LoadHeader
+	Off int64
 	Raw []byte
 }
 
@@ -72,4 +73,8 @@ type Dylib struct {
 	Timestamp            uint32
 	CurrentVersion       uint32
 	CompatibilityVersion uint32
+}
+
+type Rpath struct {
+	Name uint32
 }
