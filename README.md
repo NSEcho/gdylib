@@ -21,12 +21,6 @@ import (
 )
 
 func main() {
-	f, err := os.Open(os.Args[1])
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
 	r, err := gdylib.Run(os.Args[1], os.Args[2],
 		gdylib.WithLoadType(gdylib.DYLIB))
 	if err != nil {
