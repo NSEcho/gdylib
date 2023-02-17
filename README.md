@@ -3,7 +3,9 @@
 Module providing adding following load commands:
 * `LC_LOAD_DYLIB`
 * `LC_LOAD_WEAK_DYLIB`
-* `LC_RPATH` (TODO)
+* `LC_RPATH`
+
+Adding loads can be accomplished with keeping the old signature or removal of it. Module will check whether there is enough space for the new load and return `ErrNotEnoughSpace` if there is not enough.
 
 This module is heavily inspired/guided by [insert_dylib](https://github.com/tyilo/insert_dylib), [install_name_tool](https://www.unix.com/man-page/osx/1/install_name_tool/) projects.
 
@@ -44,11 +46,9 @@ func main() {
 ```bash
 $ go run main.go a.out @executable_path/FridaGadget.dylib new_file
 $ otool -l new_file | tail
-  cmdsize 16
-  dataoff 32920
  datasize 0
 Load command 16
-          cmd LC_LOAD_DYLIB
+          cmd LC_LOAD_WEAK_DYLIB
       cmdsize 64
          name @executable_path/FridaGadget.dylib (offset 24)
    time stamp 0 Thu Jan  1 01:00:00 1970
