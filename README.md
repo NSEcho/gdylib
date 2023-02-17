@@ -22,7 +22,8 @@ import (
 
 func main() {
 	r, err := gdylib.Run(os.Args[1], os.Args[2],
-		gdylib.WithLoadType(gdylib.DYLIB))
+		gdylib.WithLoadType(gdylib.WEAK),
+		gdylib.WithRemoveCodeSig(true))
 	if err != nil {
 		panic(err)
 	}
