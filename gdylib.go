@@ -41,10 +41,34 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 	c.f = f
 	c.getByteOrder()
 
-	var hdr macho.Header64
-	binary.Read(c.f, binary.LittleEndian, &hdr)
+	start := make([]byte, 4)
+	c.f.ReadAt(start, 0)
+	magic := binary.LittleEndian.Uint32(start)
 
-	if hdr.Filetype != macho.MH_EXECUTE {
+	var wHeader wrapperHeader
+	wHeader.magic = macho.Magic(magic)
+
+	if wHeader.magic == macho.M32 {
+		binary.Read(c.f, binary.LittleEndian, &wHeader.m32)
+	} else {
+		binary.Read(c.f, binary.LittleEndian, &wHeader.m64)
+	}
+
+	var filetype macho.Filetype
+	var ncmds uint32
+	var sizeofcmds uint32
+
+	if wHeader.magic == macho.M32 {
+		filetype = wHeader.m32.Filetype
+		ncmds = wHeader.m32.NCmds
+		sizeofcmds = wHeader.m32.SizeOfCmds
+	} else {
+		filetype = wHeader.m64.Filetype
+		ncmds = wHeader.m64.NCmds
+		sizeofcmds = wHeader.m64.SizeOfCmds
+	}
+
+	if filetype != macho.MH_EXECUTE {
 		return nil, ErrNotExecute
 	}
 
@@ -52,13 +76,13 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 	var lcDataSize uint32
 
 	off, _ := c.f.Seek(0, io.SeekCurrent)
-	for i := 0; i < int(hdr.NCmds); i++ {
+	for i := 0; i < int(ncmds); i++ {
 		var ld macho.LoadHeader
 		binary.Read(c.f, binary.LittleEndian, &ld)
 		switch ld.Cmd {
 		case macho.LC_CODE_SIGNATURE:
 			if c.removeCodeSig {
-				if i != int(hdr.NCmds-1) {
+				if i != int(ncmds-1) {
 					return nil, ErrNotLastCommand
 				}
 
@@ -67,7 +91,7 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 				lcDataSize = lcCode.DataSize
 				f.Seek(off, 0)
 				// write zero in the place where LC_CODE_SIGNATURE was
-				buffer := macho.ZeroSlice(int(ld.Size))
+				buffer := zeroSlice(int(ld.Size))
 				loads = append(loads, macho.Load{
 					LoadHeader: macho.LoadHeader{Cmd: ld.Cmd, Size: ld.Size},
 					Raw:        buffer,
@@ -123,8 +147,8 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 				for i := 0; i < len(rest); i++ {
 					cmdBuffer[i+len(load.Raw)] = rest[i]
 				}
-				hdr.NCmds -= 1
-				hdr.SizeOfCmds -= load.Size
+				ncmds -= 1
+				sizeofcmds -= load.Size
 			}
 		}
 	} else {
@@ -142,10 +166,23 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 		return nil, ErrNotEnoughSpace
 	}
 
-	hdr.NCmds += 1
-	hdr.SizeOfCmds += cmdSize
+	if wHeader.magic == macho.M32 {
+		wHeader.m32.SizeOfCmds = sizeofcmds
+		wHeader.m32.NCmds = ncmds
 
-	binary.Write(c.bts, binary.LittleEndian, hdr)
+		wHeader.m32.NCmds += 1
+		wHeader.m32.SizeOfCmds += cmdSize
+
+		binary.Write(c.bts, binary.LittleEndian, wHeader.m32)
+	} else {
+		wHeader.m64.SizeOfCmds = sizeofcmds
+		wHeader.m64.NCmds = ncmds
+
+		wHeader.m64.NCmds += 1
+		wHeader.m64.SizeOfCmds += cmdSize
+
+		binary.Write(c.bts, binary.LittleEndian, wHeader.m64)
+	}
 
 	end, _ := c.f.Seek(0, io.SeekEnd)
 
@@ -154,6 +191,17 @@ func Run(binaryPath, dylibPath string, opts ...Option) (io.Reader, error) {
 		if c.removeCodeSig {
 			if load.Cmd != macho.LC_CODE_SIGNATURE {
 				switch load.Cmd {
+				case macho.LC_SEGMENT:
+					var seg macho.Segment
+					bt := bytes.NewBuffer(load.Raw[8:])
+					binary.Read(bt, binary.LittleEndian, &seg)
+					if string(stripNull(seg.SegName[:])) == "__LINKEDIT" {
+						seg.FileSize -= lcDataSize
+						newL := new(bytes.Buffer)
+						binary.Write(newL, binary.LittleEndian, load.LoadHeader)
+						binary.Write(newL, binary.LittleEndian, seg)
+						load.Raw = newL.Bytes()
+					}
 				case macho.LC_SEGMENT_64:
 					var seg macho.Segment64
 					bt := bytes.NewBuffer(load.Raw[8:])

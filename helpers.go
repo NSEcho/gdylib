@@ -7,6 +7,12 @@ import (
 	"unsafe"
 )
 
+type wrapperHeader struct {
+	magic macho.Magic
+	m32   macho.Header32
+	m64   macho.Header64
+}
+
 func configFromOpts(dylib, bin string, opts ...Option) *config {
 	c := &config{
 		dylibPath: dylib,
@@ -38,6 +44,14 @@ func stripNull(data []byte) []byte {
 		}
 	}
 	return data
+}
+
+func zeroSlice(size int) []byte {
+	s := make([]byte, size)
+	for i := 0; i < size; i++ {
+		s[i] = 0
+	}
+	return s
 }
 
 func (c *config) getCmdSize() uint32 {
@@ -82,7 +96,7 @@ func (c *config) writeLoad(lHeader macho.LoadHeader) {
 
 	if ct != lHeader.Size {
 		diff := lHeader.Size - ct
-		zero := macho.ZeroSlice(int(diff))
+		zero := zeroSlice(int(diff))
 		c.bts.Write(zero)
 	}
 }
