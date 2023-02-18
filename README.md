@@ -9,6 +9,8 @@ Adding loads can be accomplished with keeping the old signature or removal of it
 
 This module is heavily inspired/guided by [insert_dylib](https://github.com/tyilo/insert_dylib), [install_name_tool](https://www.unix.com/man-page/osx/1/install_name_tool/) projects.
 
+It supports 32bit and 64bit architectures with assumed little endian. FAT binaries are not yet supported.
+
 # Usage
 
 ```golang
